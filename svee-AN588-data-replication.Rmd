@@ -36,16 +36,31 @@ Here is the data we'll be analyzing
 # load data
 # use str function to see what each variable is! 
 ```
-
+- **female_class** indicates whether the female is an adult (1) or adolescent (2). <br>
+- **male_class** indicates whether the male is unflanged (1) or flanged (2). <br>
+- **mating_score** is an ordinal variable that describes whether females were resistant (1-2), receptive (3-7), or proceptive (8-10) during a mating event. These scores are classified in the column **mating_behavior**. 
 
 # Descriptive statistical analysis
 "Descriptive statistics were calculated for mating score (mean, median, mode) and mating duration (mean, median), and mating behavior types (mean, range) for adolescent and adult females."
 
 # Data visualization
+I will be replicating the following figure from this paper.
+```{r fig 2, echo=FALSE}
+knitr::include_graphics("Fig2boxplot.png")
+```
+
+[something here...]
+```{r boxplot replication}
+
+```
 
 # Inferential statistical analysis
+
+## Testing model assumptions
+Test model assumptions!! 
+
+## Creating GLMM
 - GLMMs with ordinal distribution used to predict mating score
 - Only mating events of females who were potentially cycling (not pregnant or lactating) were included
 - Female class (adolescent or adult), mating duration, and male type (flanged or unflanged) used as fixed effects
 - Female and male IDs used as random effects for account for repeated measures of same individual
-Test model assumptions!! 
