@@ -42,6 +42,7 @@ library(tidyverse)
 library(DescTools) # descriptive stats
 library(ggsignif) # data visualization
 library(ordinal) # glmms for ordinal data
+library(AICcmodavg) # AICc model comparisons
 ```
 
 I cleaned up the data in Excel before importing it into R. The original Excel file contained a lot of annotations, sheets with calculations, and columns with notes that weren't relevant to this replication. I copied the relevant columns into a new Excel sheet, converted it into a csv file, and saved them to my repository. <br><br>
@@ -194,7 +195,7 @@ summary(glmm_data$reprod_status) # it worked!
 ```
 
 
-## Exploratory data analysis
+## Exploring the data
 Before jumping directly into the model, I want to explore the data and plot some variables.
 ```{r glmm eda}
 head(glmm_data)
@@ -229,12 +230,10 @@ plot(data = glmm_data, mating_duration ~ factor_male_class, col = c("orange"))
 
 It looks like there's a greater range of mating duration for flanged males. They also have the highest mating duration, which makes sense given what we know about flanged males.
 
-## Creating the GLMM
-O'Connell et al. (2019) use GLMMs with an ordinal distribution to predict the mating score. Because my dependent/response variable, mating score, has an ordinal distribution, I will be using the clmm() function from the {ordinal} package.
+## Selecting GLMM link function
+O'Connell et al. (2019) use GLMMs with an ordinal distribution to predict the mating score. Because my dependent/response variable, mating score, has an ordinal distribution, I will be using the clmm() function from the {ordinal} package. The paper specifies that fixed effects include female class (adolescent or adult), mating duration, and male class (flanged or unflanged). Female and male IDs were used as random effects to account for repeated measures from the same individual. 
 
-The paper specifies that fixed effects include female class (adolescent or adult), mating duration, and male class (flanged or unflanged). Female and male IDs were used as random effects to account for repeated measures from the same individual.
-
-Furthermore, O'Connell et al. (2019) state that, "using the GLMMs to predict mating score, all combinations of possible two-way interaction effects were tested and subsequently omitted from the final model, as none of the interactions were significant". To confirm this, I will run likelihood ratio tests to compare models containing interaction effects between fixed effects. I am testing the probability of actually seeing this collected data given a particular model. 
+They also state that all combinations of possible two-way interactions effects were tested and subsequently omitted from the final model, as none were significant. In addition to making a GLMM to predict mating score, I will also run likelihood ratio tests to compare models containing interaction effects. I am testing the probability of actually seeing this collected data given a particular model.
 
 I started by using relevel() to change the baseline group to match the output shown in the paper.
 ```{r relevel}
@@ -248,72 +247,71 @@ full <- clmm(data = glmm_data, mating_score ~ factor_female_class + factor_male_
 summary(full)
 ```
 
-### Model selection
 The values in the model summary did not match those from the paper, which made me wonder if O'Connell et al. (2019) used a different link function. They did not specify which link function they used for their GLMM but the clmm() function applies a default logit-link function. Other available link functions are probit, log-log (negative log-log), clog-log (complementary log-log), and cauchit. 
 
-Christensen (2011) selected the most appropriate link function for their model by comparing the log-likelihood of models with different link functions and selecting the model with the highest log-likelihood. I did the same with my model. I disregarded the model with the 'cauchit' link function because it returned an error message that said "Model is nearly unidentifiable: large eigenvalue ratio".
-```{r}
-probit <- clmm(data = glmm_data, link = c("probit"), mating_score ~ factor_female_class + factor_male_class + mating_duration + (1|femaleID) + (1|maleID))
-probit$logLik
-
+Christensen (2011) stated that the log-log link function was appropriate for variables with a right skew distribution, which I saw in the histogram for mating score (scroll up). Smith & McKenna (2012) and this [link](https://bookdown.org/chua/ber642_advanced_regression/ordinal-logistic-regression.html) also suggest that the choice of link function used in an ordinal regression depends on the distribution of the ordinal outcome, in which the log-log link function is used when smaller categories or values are more probable. Based on these sources, I am going to select the model with the log-log link function.
+```{r coglog}
 loglog <- clmm(data = glmm_data, link = c("loglog"), mating_score ~ factor_female_class + factor_male_class + mating_duration + (1|femaleID) + (1|maleID))
-loglog$logLik
 
-cloglog <- clmm(data = glmm_data, link = c("cloglog"), mating_score ~ factor_female_class + factor_male_class + mating_duration + (1|femaleID) + (1|maleID))
-cloglog$logLik
-```
-The 'cloglog' (complementary log-log) link function returns the highest log-likelihood value so I will use this model moving forward. I think using this link function makes sense because [...]
-
-However, Christensen (2011) stated that the log-log link function was appropriate for variables with a right skew distribution, which I saw in the histogram for mating score. Smith & McKenna (2012) and this link (https://bookdown.org/chua/ber642_advanced_regression/ordinal-logistic-regression.html) also suggest that the choice of link function used in an ordinal regression depends on the distribution of the ordinal outcome, in which the log-log link function is used when smaller categories or values are more probable.
-```{r cloglog}
-summary(cloglog)
+summary(loglog)
 ```
 
-I will move forward with this model and compare it to those with interaction effects.
+These values don't entirely match those from the paper, but they are close enough. This might be because some lines of data were removed for undisclosed reasons, which was the case when I was calculating descriptive stats. However, the overall interpretation still matches the paper. Female class predicts mating score (p = 0.00287) whereas male type (p = 0.35532) and mating duration (p = 0.19920) do not. Adolescent females in particular had significantly higher mating scores than adult females (β=1.948, p=.001).
 
-### Interaction effects
+I still need to confirm that none of the models with interaction effects are significant so I will move on and compare them to this current model.
+
+## Comparing interaction effects
 The fixed effects are female class, male class, and mating duration. There are 3 possible ways to create two-way interaction effects: 1) female class * male class, 2) male class * mating duration, and 3) mating duration * female class. I created models with these different interaction effects.
 ```{r female x male}
 # female class * male class
-int1 <- clmm(data = glmm_data, mating_score ~ factor_female_class * factor_male_class + mating_duration + (1|femaleID) + (1|maleID))
+int1 <- clmm(data = glmm_data, link = c("loglog"), mating_score ~ factor_female_class * factor_male_class + mating_duration + (1|femaleID) + (1|maleID))
 summary(int1)
 ```
 
 ```{r male x mating duration}
 # male class * mating duration
-int2 <- clmm(data = glmm_data, mating_score ~ factor_female_class + factor_male_class * mating_duration + (1|femaleID) + (1|maleID))
+int2 <- clmm(data = glmm_data, link = c("loglog"), mating_score ~ factor_female_class + factor_male_class * mating_duration + (1|femaleID) + (1|maleID))
 summary(int2)
 ```
 
 ```{r mating duration x female}
 # mating duration * female class
-int3 <- clmm(data = glmm_data, mating_score ~ factor_female_class * mating_duration + factor_male_class + (1|femaleID) + (1|maleID))
+int3 <- clmm(data = glmm_data, link = c("loglog"), mating_score ~ factor_female_class * mating_duration + factor_male_class + (1|femaleID) + (1|maleID))
 summary(int3)
 ```
 
-### Model comparisons
-I'm comparing each model containing interactions effects against the full model without interaction effects. The {ordinal} package includes an anova() function that performs likelihood ratio tests from the clmm() function output.
+Now that I created all the models with interactions effects, I am going to compare each of them against the full model without interaction effects. The {ordinal} package includes an anova() function that performs likelihood ratio tests from the clmm() function output.
 ```{r comparing models}
-anova(cloglog, int1)
-anova(cloglog, int2)
-anova(cloglog, int3)
+anova(loglog, int1)
+anova(loglog, int2)
+anova(loglog, int3)
 ```
-int2 and int3 are significant but i didn't include REML = FALSE in models like we did in modules. clmm doesn't recognize it but also don't know what kind of maximum likelihood ordinal package anova is doing. 
 
-messing around, trying AICc, but am i even supposed to be doing this? int2 also has lowest AIC value
-https://www.scribbr.com/statistics/akaike-information-criterion/
+int2 and int3, which represent models with interaction effects for male class * mating duration (p = 0.0007074) and mating duration * female class (p = 0.004938), respectively, are both significant. This suggests that these models with these interaction effects are a better fit for the data than the 'null' model lacking these interaction effects. This is different from O'Connell et al.'s paper, which found no significant two-way interaction effects. Again, this may come from potentially missing data (see previous explanations). 
+
+Since the original model lacking interaction effects is no longer the best fit for the data, I used AICc through the {AICcmodavg} package to compare models and confirm that 'int2' with the lowest p-value is the best model. I left out the 'int1' model because it was not significant.
 ```{r AICc}
-library(AICcmodavg)
-print(aictab(list(cloglog, int1, int2, int3), c("cloglog", "int1", "int2", "int3")))
+print(aictab(list(loglog, int2, int3), c("loglog", "int2", "int3")))
 ```
 
-## Interpreting GLMM
-discuss glmm results from replication and how they compare to original paper
+## Interpreting the GLMM
+'int2' is the best fit for the data because it has the lowest AICc value. This model contains the interaction effect between male class and mating duration. 
+```{r int2}
+summary(int2)
+```
+Female class, specifically adolescent females (p = 0.00118) and mating duration (p = 0.01850) are significant coefficients. Their positive value indicates that adolescent females and higher mating duration increase mating score, indicating higher proceptivity. More specifically, the coefficient 'factor_female_classAdolescent' is the slope/β coefficient (slope) for the effect of female class so the positive 2.249443 value means that mating score is greater by 2.249443 units for adolescent females than adult females. A similar interpretation can be made for mating duration.
+
+However, the interaction between male class and mating duration is also significant (p = 0.00666). The coefficient is negative, suggesting that the effect of the combined action of both predictors is less than (by 0.007087) the sum of the individual effects of male class and mating duration.
+
+It makes sense that adolescent female orangutans are more proceptive than adult females. They are younger and nulliparous, making them less attractive to males; proceptivity would make them more attractive. They may also be more proceptive as a way to familiarize themselves with males and assess how coercive they are. It also makes sense that mating duration increases mating proceptivity, as matings involving adolescent female orangutans are exceptionally long. This can be interpreted as there being a high degree of investment in matings and building relationships with male orangutans, particularly flanged males, by adolescent females.
+
+```{r gif, echo=FALSE}
+knitr::include_graphics("https://www.mediastorehouse.com/p/172/borneo-orangutan-female-juvenile-hanging-branch-8184726.jpg.webp")
+```
 
 # Final reflections
-Overall, [...] <br>
-
-I received the raw data from the first author because it was not originally publically available. Because of this, the raw data file contained a lot of additional comments and columns that were not directly relevant to the analyses conducted in the paper. I cleaned up the data on my own and only included columns that I thought would be necessary. As I began working with the data in R, I realized that I had to do a lot of additional formatting to make the data compatible with the packages (e.g. renaming age class vector and changing it to a factor). This played a big role in some of the discrepancies between my results and what was published in the paper! [...]
+I did find support for O'Connell et al.'s finding that adolescent female mating events had significantly higher mating scores than adult females. The methods seemed simple and straightforward when I initially read the paper. However, I did ran into a lot of unexpected problems throughout the replication assignment. I received the raw data from the first author because it was not originally made publically available. The raw file contained a lot of additional information that was not directly relevant to the analyses. I cleaned up the data on my own, which may have contributed to the mismatch between my statistics and what was published. While working on the descriptive statistics, I realized that authors removed some lines of data, but I was unable to identify which ones because this was not described in the paper. I also thought the paper could have included more detail about the GLMM, particularly in regards to which link function they used.
+This project highlighted the importance of being as specific as possible when describing methods in scientific publications. This contributes to its reproducibility and replicability. 
 
 # References
 Christensen, R. H. B. (2011). Analysis of ordinal data with cumulative link models—estimation with the R-package ordinal. R-package version, 28, 406.
