@@ -89,7 +89,8 @@ ms <- rbind(adult, adolescent); ms
 
 - The mean mating score for adolescent females is higher than adult females. However, both values fall within the range of receptive behaviors, according to table 2. <br>
 - O'Connell et al. (2019) reports that "adolescent females had a mean mating score of 7.4 ± 2.5 (median = 8, mode = 10, range = 2–10), whereas adult females (N=8) had a mean mating score of 3.3±2.0 (median=2, mode=2, range = 1–9). The mean adolescent female sexual contact duration was 854 ± 285 s, whereas the mean adult female duration was 486 ± 65 s." <br>
-- My values don't match the published results. I ended up going back to the original dataset, where it seemed like the descriptive stats were calculated in Excel instead of SPSS. The data was manually pasted into a separate Excel page and descriptive stats were calculated using the built in Excel function. Each pasted chunk for adults and adolescents is missing 3 entries (excluding NAs), which explain why my values differ. It's unclear whether these data points were accidentally or deliberately excluded.
+- I was slightly confused about how I should have approached this section because O'Connell et al. ended up providing additional descriptive statistics that were not actually mentioned in the methods section (e.g. providing range here even though it wasn't previously described). I decided to only follow what was discussed in the methods section to avoid confusion. <br>
+- My values also did not match the published results. I ended up going back to the original dataset, where I realized that the descriptive stats were calculated in Excel instead of SPSS. The data was manually pasted into a separate Excel page and descriptive stats were calculated using the built in Excel function. Each pasted chunk for adults and adolescents is missing 3 entries (excluding NAs), which explain why my values differ. It's unclear whether these data points were accidentally or deliberately excluded. I wasn't able to figure out which ones were excluded without individually comparing each line of data (which would have taken too long) so I proceeded with the dataset I had.
 
 ### Mating duration
 I am calculating the mean and median of mating duration by adult and adolescent females. <br>
@@ -151,7 +152,7 @@ Adolescent <- list(Resistant = as.numeric(adol_resist_mms),
 mean_score <- rbind(Adult, Adolescent); mean_score
 ```
 
-As you can see, I initially used {dyplyr} to create smaller data frames for each mating behavior type for adolescent and adult females and then calculated the mean for each. However, looking at the final output for mean mating behavior helped me realize that my approach was incorrect. My calculated means will only fall between the range I constructed for each mating behavior type (resistant 1-2; receptive 3-7; proceptive 8-10). Table 3 (below) indicates that the mean describes the *number of acts* per mating event. My dataset only contains data about types of acts, not number of acts, which is what I need to calculate this descriptive statistic. I was not able to move forward with this part of the analysis since I don't have access to this data.
+As you can see, I initially used {dyplyr} to create smaller data frames for each mating behavior type for adolescent and adult females and then calculated the mean for each. However, looking at the output for the above table helped me realize that my approach was incorrect. My calculated means will only fall within the range I constructed for each mating behavior type (resistant 1-2; receptive 3-7; proceptive 8-10). After reading the paper more closely, I noticed that Table 3 (below) states that the mean describes the *number of acts* per mating event. My dataset only contains data about types of acts, not number of acts, which is what I need to calculate this descriptive statistic. I was not able to move forward with this part of the analysis since this was not provided in the data.
 
 ```{r table 3, echo=FALSE}
 knitr::include_graphics("Table3.png")
@@ -163,7 +164,7 @@ I will be replicating the following figure from this paper using {ggplot2}:
 knitr::include_graphics("Fig2boxplot.png")
 ```
 
-When I initially ran the code to make the plot, I received an error message because Female Class was an integer-type vector containing 1s and 2s. I needed to group them into Adult and Adolescent rather than numbers so I created a new factor-type vector that labeled the 1s and 2s according to their age class and added it to the original dataset. <br>
+When I initially tried to make the plot, I received an error message because Female Class was an integer-type vector containing 1s and 2s. I needed to group them into Adult and Adolescent rather than numbers so I created a new factor-type vector that labeled the 1s and 2s according to their age class and added it to the original dataset. <br>
 ```{r ggplot prelim}
 female_class_labels <- c("Adolescent", "Adult")
 factor_female_class <- factor(matingdata$female_class, levels = 1:2, labels = female_class_labels)
@@ -188,7 +189,7 @@ As you can see, my boxplot looks pretty identical to one from the paper! I used 
 # GLMM with ordinal data
 O'Connell et al. (2019) used a generalized linear mixed model (GLMM) with an ordinal distribution to predict the mating score. The outcome of interest, mating score, is an ordinal variable with 1 being fully resistant and 10 being fully proceptive. The types of behaviors exhibited at each level is described in Table 2 (above).
 
-They also note that only mating events of females who were potentially cycling (not pregnant or lactating) were included. I used {dyplr} to filter out the data and push data for cycling females into a new data frame. 
+They also note that only mating events of females who were potentially cycling (not pregnant or lactating) were included. I used {dyplr} to filter out the data and push data from only cycling females into a new data frame. 
 ```{r keep cycling females}
 glmm_data <- matingdata[matingdata$reprod_status == "cycling", ]
 summary(glmm_data$reprod_status) # it worked! 
@@ -228,7 +229,7 @@ glmm_data$factor_male_class <- factor_male_class
 plot(data = glmm_data, mating_duration ~ factor_male_class, col = c("orange"))
 ```
 
-It looks like there's a greater range of mating duration for flanged males. They also have the highest mating duration, which makes sense given what we know about flanged males.
+It looks like there's a greater range of mating duration for flanged males. They also have the highest mating duration, which makes sense given what we know about flanged males (they are preferred by females).
 
 ## Selecting GLMM link function
 O'Connell et al. (2019) use GLMMs with an ordinal distribution to predict the mating score. Because my dependent/response variable, mating score, has an ordinal distribution, I will be using the clmm() function from the {ordinal} package. The paper specifies that fixed effects include female class (adolescent or adult), mating duration, and male class (flanged or unflanged). Female and male IDs were used as random effects to account for repeated measures from the same individual. 
@@ -249,16 +250,16 @@ summary(full)
 
 The values in the model summary did not match those from the paper, which made me wonder if O'Connell et al. (2019) used a different link function. They did not specify which link function they used for their GLMM but the clmm() function applies a default logit-link function. Other available link functions are probit, log-log (negative log-log), clog-log (complementary log-log), and cauchit. 
 
-Christensen (2011) stated that the log-log link function was appropriate for variables with a right skew distribution, which I saw in the histogram for mating score (scroll up). Smith & McKenna (2012) and this [link](https://bookdown.org/chua/ber642_advanced_regression/ordinal-logistic-regression.html) also suggest that the choice of link function used in an ordinal regression depends on the distribution of the ordinal outcome, in which the log-log link function is used when smaller categories or values are more probable. Based on these sources, I am going to select the model with the log-log link function.
+Christensen (2011) stated that the log-log link function was appropriate for variables with a right skew distribution, which I saw in the histogram for mating score (scroll up). Smith & McKenna (2012) and this [link](https://bookdown.org/chua/ber642_advanced_regression/ordinal-logistic-regression.html) also suggest that the choice of link function used in an ordinal regression depends on the distribution of the ordinal outcome, in which the log-log link function is used when smaller categories or values are more probable. The histogram I previously created for the distribution of mating scores showed a right skewed distribution, in which lower mating scores were more common. Based on these sources, I am going to select the model with the log-log link function.
 ```{r coglog}
 loglog <- clmm(data = glmm_data, link = c("loglog"), mating_score ~ factor_female_class + factor_male_class + mating_duration + (1|femaleID) + (1|maleID))
 
 summary(loglog)
 ```
 
-These values don't entirely match those from the paper, but they are close enough. This might be because some lines of data were removed for undisclosed reasons, which was the case when I was calculating descriptive stats. However, the overall interpretation still matches the paper. Female class predicts mating score (p = 0.00287) whereas male type (p = 0.35532) and mating duration (p = 0.19920) do not. Adolescent females in particular had significantly higher mating scores than adult females (β=1.7866713, p=.00287).
+These values don't entirely match those from the paper, but they are close enough. This might be because some lines of data were removed for undisclosed reasons, which was the case when I was calculating descriptive stats. However, the overall interpretation still matches the paper. Female class predicts mating score (p = 0.00287) whereas male type (p = 0.35532) and mating duration (p = 0.19920) do not. Adolescent females in particular had significantly higher mating scores than adult females (β = 1.7866713, p = 0.00287).
 
-I still need to confirm that none of the models with interaction effects are significant so I will move on and compare them to this current model.
+I still need to confirm that none of the models with interaction effects are significant so I will compare those against this current model.
 
 ## Comparing interaction effects
 The fixed effects are female class, male class, and mating duration. There are 3 possible ways to create two-way interaction effects: 1) female class * male class, 2) male class * mating duration, and 3) mating duration * female class. I created models with these different interaction effects.
@@ -303,15 +304,16 @@ Female class, specifically adolescent females (p = 0.00118) and mating duration 
 
 However, the interaction between male class and mating duration is also significant (p = 0.00666). The coefficient is negative, suggesting that the effect of the combined action of both predictors is less than (by 0.007087) the sum of the individual effects of male class and mating duration.
 
-It makes sense that adolescent female orangutans are more proceptive than adult females. They are younger and nulliparous, making them less attractive to males; proceptivity would make them more attractive. They may also be more proceptive as a way to familiarize themselves with males and assess how coercive they are. It also makes sense that mating duration increases mating proceptivity, as matings involving adolescent female orangutans are exceptionally long. This can be interpreted as there being a high degree of investment in matings and building relationships with male orangutans, particularly flanged males, by adolescent females.
+For comparison, O'Connell et a. (2019) reported: "Female class significantly predicted mating score (p = .001), whereas male type (flanged or unflanged) and mating duration did not significantly predict mating score (p = .309 and p = .181, respectively). Adolescent female mating events (N = 19) had significantly higher mating scores (indicating more proceptivity) than did those of adult females (N=26; β=1.948, p=.001)."
 
-```{r gif, echo=FALSE}
+It makes sense that adolescent female orangutans are more proceptive than adult females. They are younger and nulliparous, making them less attractive to males; being more proceptive may make males more willing to mate with them. They may also be more proceptive as a way to familiarize themselves with males and assess how coercive they are. It also makes sense that mating duration increases mating proceptivity, as matings involving adolescent female orangutans are exceptionally long. This can be interpreted as there being a high degree of investment in matings and developing relationships with male orangutans, particularly flanged males, by adolescent females.
+
+```{r gif, echo=FALSE, fig.align = 'center'}
 knitr::include_graphics("https://www.mediastorehouse.com/p/172/borneo-orangutan-female-juvenile-hanging-branch-8184726.jpg.webp")
 ```
 
 # Final reflections
-I did find support for O'Connell et al.'s finding that adolescent female mating events had significantly higher mating scores than adult females. The methods seemed simple and straightforward when I initially read the paper. However, I did ran into a lot of unexpected problems throughout the replication assignment. I received the raw data from the first author because it was not originally made publically available. The raw file contained a lot of additional information that was not directly relevant to the analyses. I cleaned up the data on my own, which may have contributed to the mismatch between my statistics and what was published. While working on the descriptive statistics, I realized that authors removed some lines of data, but I was unable to identify which ones because this was not described in the paper. I also thought the paper could have included more detail about the GLMM, particularly in regards to which link function they used.
-This project highlighted the importance of being as specific as possible when describing methods in scientific publications. This contributes to its reproducibility and replicability. 
+I did find support for O'Connell et al.'s finding that adolescent female mating events had significantly higher mating scores than adult females. The methods seemed simple and straightforward when I initially read the paper. However, I did ran into a lot of unexpected problems throughout the replication assignment. I received the raw data from the first author because it was not originally made publically available. The raw file contained a lot of additional information that was not immediately relevant to my analyses. I cleaned up the data on my own, which may have contributed to the mismatch between my statistics and what was published. While working on the descriptive statistics, I realized that authors removed some lines of data, but I was unable to identify which ones because this was not described in the paper. This also potentially affected my GLMM results. My model summary values did not exactly match and I also found some models with interaction effects were significant, which O'Connell et al. did not find. I assume that the results from our analyses would be more aligned if a polished version of the data used was made available by the journal and authors. I also thought the paper could have included more detail about the GLMM, particularly in regards to which link function they used. This project highlighted the importance of being as specific as possible when describing methods in scientific publications. This contributes to its reproducibility and replicability. 
 
 # References
 Christensen, R. H. B. (2011). Analysis of ordinal data with cumulative link models—estimation with the R-package ordinal. R-package version, 28, 406.
