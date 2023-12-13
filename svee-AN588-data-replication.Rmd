@@ -231,7 +231,7 @@ plot(data = glmm_data, mating_duration ~ factor_male_class, col = c("orange"))
 
 It looks like there's a greater range of mating duration for flanged males. They also have the highest mating duration, which makes sense given what we know about flanged males (they are preferred by females).
 
-## Selecting GLMM link function
+## Selecting a link function
 O'Connell et al. (2019) use GLMMs with an ordinal distribution to predict the mating score. Because my dependent/response variable, mating score, has an ordinal distribution, I will be using the clmm() function from the {ordinal} package. The paper specifies that fixed effects include female class (adolescent or adult), mating duration, and male class (flanged or unflanged). Female and male IDs were used as random effects to account for repeated measures from the same individual. 
 
 They also state that all combinations of possible two-way interactions effects were tested and subsequently omitted from the final model, as none were significant. In addition to making a GLMM to predict mating score, I will also run likelihood ratio tests to compare models containing interaction effects. I am testing the probability of actually seeing this collected data given a particular model.
@@ -257,9 +257,9 @@ loglog <- clmm(data = glmm_data, link = c("loglog"), mating_score ~ factor_femal
 summary(loglog)
 ```
 
-These values don't entirely match those from the paper, but they are close enough. This might be because some lines of data were removed for undisclosed reasons, which was the case when I was calculating descriptive stats. However, the overall interpretation still matches the paper. Female class predicts mating score (p = 0.00287) whereas male type (p = 0.35532) and mating duration (p = 0.19920) do not. Adolescent females in particular had significantly higher mating scores than adult females (β = 1.7866713, p = 0.00287).
+These values still don't entirely match those from the paper, but they are close. This might be because some lines of data were removed for undisclosed reasons, which was the case when I was calculating descriptive stats. However, the overall interpretation still matches the paper. Female class predicts mating score (p = 0.00287) whereas male type (p = 0.35532) and mating duration (p = 0.19920) do not. Adolescent females in particular had significantly higher mating scores than adult females (β = 1.7866713, p = 0.00287).
 
-I still need to confirm that none of the models with interaction effects are significant so I will compare those against this current model.
+I still need to confirm whether models with interaction effects are significant so I will compare those against this current model.
 
 ## Comparing interaction effects
 The fixed effects are female class, male class, and mating duration. There are 3 possible ways to create two-way interaction effects: 1) female class * male class, 2) male class * mating duration, and 3) mating duration * female class. I created models with these different interaction effects.
@@ -292,28 +292,42 @@ int2 and int3, which represent models with interaction effects for male class * 
 
 Since the original model lacking interaction effects is no longer the best fit for the data, I used AICc through the {AICcmodavg} package to compare models and confirm that 'int2' with the lowest p-value is the best model. I left out the 'int1' model because it was not significant.
 ```{r AICc}
-print(aictab(list(loglog, int2, int3), c("loglog", "int2", "int3")))
+print(aictab(list(full, loglog, int2, int3), c("full", "loglog", "int2", "int3")))
 ```
 
 ## Interpreting the GLMM
-'int2' is the best fit for the data because it has the lowest AICc value. This model contains the interaction effect between male class and mating duration. 
+Compared to the other models, 'int2' is the best fit for this dataset because it has the lowest AICc value. This model contains the interaction effect between male class and mating duration. 
 ```{r int2}
 summary(int2)
 ```
-Female class, specifically adolescent females (p = 0.00118) and mating duration (p = 0.01850) are significant coefficients. Their positive value indicates that adolescent females and higher mating duration increase mating score, indicating higher proceptivity. More specifically, the coefficient 'factor_female_classAdolescent' is the slope/β coefficient (slope) for the effect of female class so the positive 2.249443 value means that mating score is greater by 2.249443 units for adolescent females than adult females. A similar interpretation can be made for mating duration.
 
-However, the interaction between male class and mating duration is also significant (p = 0.00666). The coefficient is negative, suggesting that the effect of the combined action of both predictors is less than (by 0.007087) the sum of the individual effects of male class and mating duration.
+Female class (p = 0.00118) is a significant predictor of mating score. More specifically, adolescent female is the slope/β coefficient for the effect of female class so the positive 2.249443 value suggests that mating score is greater by 2.249443 units for adolescent females than adult females. Mating duration is also a moderate, but significant predictor of mating score that can be interpreted the same way as female class. Taken together, adolescent females and higher mating duration both increase mating score, indicating higher proceptivity. 
 
-For comparison, O'Connell et a. (2019) reported: "Female class significantly predicted mating score (p = .001), whereas male type (flanged or unflanged) and mating duration did not significantly predict mating score (p = .309 and p = .181, respectively). Adolescent female mating events (N = 19) had significantly higher mating scores (indicating more proceptivity) than did those of adult females (N=26; β=1.948, p=.001)."
+For comparison, O'Connell et a. (2019) reported: "Female class significantly predicted mating score (p = .001), whereas male type (flanged or unflanged) and mating duration did not significantly predict mating score (p = .309 and p = .181, respectively). Adolescent female mating events (N = 19) had significantly higher mating scores (indicating more proceptivity) than did those of adult females (N=26; β=1.948, p=.001)." 
 
-It makes sense that adolescent female orangutans are more proceptive than adult females. They are younger and nulliparous, making them less attractive to males; being more proceptive may make males more willing to mate with them. They may also be more proceptive as a way to familiarize themselves with males and assess how coercive they are. It also makes sense that mating duration increases mating proceptivity, as matings involving adolescent female orangutans are exceptionally long. This can be interpreted as there being a high degree of investment in matings and developing relationships with male orangutans, particularly flanged males, by adolescent females.
+We both found that female class significantly predicted mating score while male type did not. However, I found a significant effect for mating duration which O'Connell et al. did not find. It makes sense that adolescent female orangutans are more proceptive than adult females. They are younger and nulliparous, making them less attractive to males; being more proceptive may make males more willing to mate with them. They may also be more proceptive as a way to familiarize themselves with males and assess how coercive they are. It also makes sense that mating duration increases mating proceptivity, as matings involving adolescent female orangutans are exceptionally long. This can be interpreted as there being a high degree of investment in matings and developing relationships with male orangutans, particularly flanged males, by adolescent females. 
+
+I also found a significant interaction effect between male class and mating duration (β=-0.007087, p = 0.00666). In order to better interpret this, I plotted the mating duration and mating score for flanged and unflanged males below:
+
+```{r}
+glmm_data$mating_score <- as.factor(glmm_data$mating_score)
+
+interaction <- ggplot(data = glmm_data, 
+                      aes(x = mating_score, y = mating_duration, fill = factor_male_class)) +
+                      geom_point(aes(colour = factor_male_class)) + 
+                      xlab("Mating Score") + ylab("Mating Duration") +
+                      scale_x_discrete(labels=c("1","2","3","4","5","6","7","8","9","10"))
+interaction
+```
+
+It seems like being an unflanged male decreases mating duration (?). However, there is one outlier that may be skewing the overall effect of mating duration in mating score for flanged males. Although this interaction effect is significant (p = 0.00666), the effect itself seems minimal (β=-0.007087)
 
 ```{r gif, echo=FALSE, fig.align = 'center'}
 knitr::include_graphics("https://www.mediastorehouse.com/p/172/borneo-orangutan-female-juvenile-hanging-branch-8184726.jpg.webp")
 ```
 
 # Final reflections
-I did find support for O'Connell et al.'s finding that adolescent female mating events had significantly higher mating scores than adult females. The methods seemed simple and straightforward when I initially read the paper. However, I did ran into a lot of unexpected problems throughout the replication assignment. I received the raw data from the first author because it was not originally made publically available. The raw file contained a lot of additional information that was not immediately relevant to my analyses. I cleaned up the data on my own, which may have contributed to the mismatch between my statistics and what was published. While working on the descriptive statistics, I realized that authors removed some lines of data, but I was unable to identify which ones because this was not described in the paper. This also potentially affected my GLMM results. My model summary values did not exactly match and I also found some models with interaction effects were significant, which O'Connell et al. did not find. I assume that the results from our analyses would be more aligned if a polished version of the data used was made available by the journal and authors. I also thought the paper could have included more detail about the GLMM, particularly in regards to which link function they used. This project highlighted the importance of being as specific as possible when describing methods in scientific publications. This contributes to its reproducibility and replicability. 
+I did find support for O'Connell et al.'s finding that adolescent female mating events had significantly higher mating scores than adult females. The methods seemed simple and straightforward when I initially read the paper. However, I ran into a lot of unexpected problems throughout the replication assignment. I received the raw data from the first author because it was not originally made publicly available. The raw file contained a lot of additional information that was not immediately relevant to my analyses. I cleaned up the data on my own, which may have contributed to the mismatch between my statistics and what was published. While working on the descriptive statistics, I realized that the authors removed some lines of data, but I was unable to identify which ones because this was not described in the paper. This also potentially affected my GLMM results. My model summary values did not exactly match and I also found some models with interaction effects were significant, which O'Connell et al. did not find. I assume that the results from our analyses would be more similar if I accessed a more 'polished' version of the data. I also thought the paper could have included more detail about the GLMM, particularly in regards to which link function they used. This project highlighted the importance of being as specific as possible when describing methods in scientific publications, which contributes to its reproducibility and replicability. 
 
 # References
 Christensen, R. H. B. (2011). Analysis of ordinal data with cumulative link models—estimation with the R-package ordinal. R-package version, 28, 406.
